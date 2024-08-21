@@ -1,0 +1,116 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id Int @id @default(autoincrement())
+  username String @unique
+  email String @unique
+  password String
+  profilePic String
+  privacy UserPrivacy
+  
+  // Direct messaging
+  sentMessage Message[] @relation("sentMessage")
+  receivedMessage Message[] @relation("receivedMessage")
+
+  // Room or group chat
+  rooms RoomMember[]
+  roomMessage RoomMessage[]
+
+  // Room created by this user
+  roomCreated Room[] @relation("roomCreator")
+
+  // Friendships
+  friendshipsSent   Friendship[] @relation("friendshipsSent")
+  friendshipsReceived Friendship[] @relation("friendshipsReceived")
+
+  Conversation Conversation[] @relation("conversationParticipants")
+}
+
+
+model Friendship {
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  friendId Int
+
+  user     User   @relation("friendshipsSent", fields: [userId], references: [id])
+  friend   User   @relation("friendshipsReceived", fields: [friendId], references: [id])
+
+  @@unique([userId, friendId]) // Ensure that each user pair can only have one friendship
+}
+
+model Room {
+  id Int @id @default(autoincrement())
+  name String
+  createdAt DateTime @default(now())
+  creatorId Int
+  members RoomMember[]
+  messages RoomMessage[]
+
+  creator User @relation(name: "roomCreator", fields: [creatorId], references: [id])
+}
+
+model RoomMember {
+  id Int @id @default(autoincrement())
+  userId Int
+  roomId Int
+  role Role
+
+  user User @relation(fields: [userId], references: [id])
+  room Room @relation(fields: [roomId], references: [id])
+
+  @@unique([userId, roomId]) // Ensure that a user can have only one role per room
+}
+
+model RoomMessage {
+  id Int @id @default(autoincrement())
+  body String
+  senderId Int
+  roomId Int
+  createdAt DateTime @default(now())
+
+  sender User @relation(fields: [senderId], references: [id])
+  room Room @relation(fields: [roomId], references: [id])
+}
+
+model Message {
+  id Int @id @default(autoincrement())
+  body String
+  senderId Int
+  receiverId Int
+  createdAt DateTime @default(now())
+  conversationId Int?
+
+  sender User @relation(name: "sentMessage", fields: [senderId], references: [id])
+  receiver User @relation(name: "receivedMessage", fields: [receiverId], references: [id])
+  conversation Conversation? @relation(fields: [conversationId], references: [id])
+}
+
+model Conversation {
+  id Int @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  participents User[] @relation("conversationParticipants")
+  messages Message[]
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum UserPrivacy {
+  PUBLIC
+  PRIVATE
+}
